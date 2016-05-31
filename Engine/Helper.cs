@@ -1155,39 +1155,12 @@ namespace Microsoft.Windows.PowerShell.ScriptAnalyzer
                 return results;
             }
 
-            ScriptBlockAst sbAst = ast as ScriptBlockAst;
-
-            // Get rule suppression from the ast itself if it is scriptblockast
-            if (sbAst != null && sbAst.ParamBlock != null && sbAst.ParamBlock.Attributes != null)
+            var sbAsts = ast.FindAll(x => x is ScriptBlockAst, true).Cast<ScriptBlockAst>();
+            foreach (var xast in sbAsts)
             {
-                ruleSuppressionList.AddRange(RuleSuppression.GetSuppressions(sbAst.ParamBlock.Attributes, sbAst.Extent.StartOffset, sbAst.Extent.EndOffset, sbAst));
+                var attrAsts = xast.FindAll(x => x is AttributeAst, false).Cast<AttributeAst>();
+                ruleSuppressionList.AddRange(RuleSuppression.GetSuppressions(attrAsts, xast.Extent.StartOffset, xast.Extent.EndOffset, xast));
             }
-
-            // Get rule suppression from functions
-            IEnumerable<FunctionDefinitionAst> funcAsts = ast.FindAll(item => item is FunctionDefinitionAst, true).Cast<FunctionDefinitionAst>();
-
-            foreach (var funcAst in funcAsts)
-            {
-                ruleSuppressionList.AddRange(GetSuppressionsFunction(funcAst));
-            }
-
-#if !PSV3
-            // Get rule suppression from classes
-            IEnumerable<TypeDefinitionAst> typeAsts = ast.FindAll(item => item is TypeDefinitionAst, true).Cast<TypeDefinitionAst>();
-
-            foreach (var typeAst in typeAsts)
-            {
-                ruleSuppressionList.AddRange(GetSuppressionsClass(typeAst));
-            }
-
-            // Get rule suppression from configuration definitions
-            IEnumerable<ConfigurationDefinitionAst> configDefAsts = ast.FindAll(item => item is ConfigurationDefinitionAst, true).Cast<ConfigurationDefinitionAst>();
-
-            foreach (var configDefAst in configDefAsts)
-            {
-                ruleSuppressionList.AddRange(GetSuppressionsConfiguration(configDefAst));
-            }
-#endif // !PSV3
 
             ruleSuppressionList.Sort((item, item2) => item.StartOffset.CompareTo(item2.StartOffset));
 
@@ -1204,82 +1177,6 @@ namespace Microsoft.Windows.PowerShell.ScriptAnalyzer
 
             return results;
         }
-
-        /// <summary>
-        /// Returns a list of rule suppressions from the function
-        /// </summary>
-        /// <param name="funcAst"></param>
-        /// <returns></returns>
-        internal List<RuleSuppression> GetSuppressionsFunction(FunctionDefinitionAst funcAst)
-        {
-            List<RuleSuppression> result = new List<RuleSuppression>();
-
-            if (funcAst != null && funcAst.Body != null
-                && funcAst.Body.ParamBlock != null && funcAst.Body.ParamBlock.Attributes != null)
-            {
-                result.AddRange(RuleSuppression.GetSuppressions(funcAst.Body.ParamBlock.Attributes, funcAst.Extent.StartOffset, funcAst.Extent.EndOffset, funcAst));
-            }
-
-            return result;
-        }
-
-#if !PSV3
-        /// <summary>
-        /// Returns a list of rule suppression from the class
-        /// </summary>
-        /// <param name="typeAst"></param>
-        /// <returns></returns>
-        internal List<RuleSuppression> GetSuppressionsClass(TypeDefinitionAst typeAst)
-        {
-            List<RuleSuppression> result = new List<RuleSuppression>();
-
-            if (typeAst != null && typeAst.Attributes != null && typeAst.Attributes.Count != 0)
-            {
-                result.AddRange(RuleSuppression.GetSuppressions(typeAst.Attributes, typeAst.Extent.StartOffset, typeAst.Extent.EndOffset, typeAst));
-            }
-
-            if (typeAst.Members == null)
-            {
-                return result;            
-            }            
-
-            foreach (var member in typeAst.Members)
-            {
-
-                FunctionMemberAst funcMemb = member as FunctionMemberAst;
-                if (funcMemb == null)
-                {
-                    continue;
-                }
-
-                result.AddRange(RuleSuppression.GetSuppressions(funcMemb.Attributes, funcMemb.Extent.StartOffset, funcMemb.Extent.EndOffset, funcMemb));
-            }
-
-            return result;
-        }
-
-        /// <summary>
-        /// Returns a list of rule suppressions from the configuration
-        /// </summary>
-        /// <param name="configDefAst"></param>
-        /// <returns></returns>
-        internal List<RuleSuppression> GetSuppressionsConfiguration(ConfigurationDefinitionAst configDefAst)
-        {
-            var result = new List<RuleSuppression>();
-            if (configDefAst == null || configDefAst.Body == null)
-            {
-                return result;
-            }
-            var attributeAsts = configDefAst.FindAll(x => x is AttributeAst, true).Cast<AttributeAst>();
-            result.AddRange(RuleSuppression.GetSuppressions(
-                attributeAsts,
-                configDefAst.Extent.StartOffset,
-                configDefAst.Extent.EndOffset,
-                configDefAst));
-            return result;
-        }
-
-#endif // !PSV3
 
         /// <summary>
         /// Suppress the rules from the diagnostic records list.
